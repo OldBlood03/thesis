@@ -6,7 +6,6 @@ from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-
 from multiprocessing.pool import ThreadPool
 
 firefox_options = Options()
@@ -21,11 +20,17 @@ dburl = URL.create("postgresql",
                    host="localhost",
                    database="thesis")
 
+
+page = None
+while page is None or (page > 19 or page < 0):
+    try:
+        page = int(input("please enter a valid int between 0-19 (inclusive)"))
+    except:
+        print("ERROR CAUGHT. please enter a valid int between 0-19 (inclusive)\n", flush=True)
+
+table_name = f"snowball_page_{page}"  
 engine = create_engine(dburl)
-query = """SELECT DISTINCT "DOI" FROM dblp_snowball_depth_1
-            WHERE not is_empty("DOI");
-        """
-df = pd.read_sql(query,engine)
+df = pd.read_sql(table_name, engine)
 POOL_SIZE = 7
 pool = ThreadPool(POOL_SIZE)
 df["html"] = None
@@ -64,7 +69,7 @@ def scraper(frame):
         print(f"urls processed in frame {frame}: {urls_processed}", flush=True)
         doi_slice = df.loc[start:end, "DOI"]
         df.loc[start:end, "html"] = ("https://doi.org/" + doi_slice).apply(lambda url: scrape_url(url, browser))
-        df.iloc[start:end].to_sql("dblp_snowball_augmented", engine, if_exists = 'append')
+        df.iloc[start:end].to_sql(f"snowball_page_{page}_augmented", engine, if_exists = 'append')
         urls_processed += block_size
         df = df.drop(range(start,end))
     browser.Dispose()

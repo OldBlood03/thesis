@@ -46,9 +46,9 @@ def dblp_get():
 
 def serp_get():
     page_size = 20
-    max_page = 75000
+    max_page = 2000
     for page in range(0,max_page,page_size):
-        payload = {"q":"Number+Theory+Hidden+Role+Social+Deduction",
+        payload = {"q":'Number+Theory+"hidden+role"',
                    "engine" : "google_scholar",
                    "format":"json", "num":page_size, 
                    "start" : page, 
@@ -56,12 +56,36 @@ def serp_get():
                    "hl" : "en"}
         url = "https://serpapi.com/search"
         r = requests.get(url, params=payload)
-        json.dump(r.json(), f"data/serp/page_{page//page_size}.json")
+        #since api requests are costly for serp, i don't want to mess this up
+        with open(f"data/serp/page_{page//page_size}.json","w") as fp:
+            json.dump(r.json(), fp)
+
+from io import StringIO
+def serp_store():
+    df = None
+    for i in range(100):
+        with open(f"data/serp/page_{i}.json","r") as fp:
+            json_dict = json.load(fp)
+            if ("organic_results" not in json_dict): 
+                continue
+            string = json.dumps(json_dict["organic_results"])
+            buffer = StringIO(string)
+            if df is None:
+                df = pd.read_json(buffer)
+            else:
+                df = df._append(pd.read_json(buffer))
+    df["links"] = df["resources"].apply(lambda x: None if isinstance(x,float) else [y.get("link") for y in x])
+    df["authors"] = df["publication_info"].apply(lambda x: None if (isinstance(x,float) or "authors" not in x) else [y.get("name") for y in x["authors"]])
+    df["summary"] = df["publication_info"].apply(lambda x: None if isinstance(x,float) else x.get("summary"))
+    df.drop("resources", axis='columns', inplace=True)
+    df.drop("publication_info", axis='columns', inplace=True)
+    df.drop("inline_links", axis='columns', inplace=True)
+    return df
 
 def arxiv_get():
 
     base_url = 'http://export.arxiv.org/api/query?';
-    search_query = 'all:game+theory'
+    search_query = 'game%20theory'
     start = 0
     total_results = 17000
     results_per_iteration = 100
@@ -213,6 +237,49 @@ def snowball_from_dblp(df):
 
     return og
 
+def snowball_from_arxiv(df):
+    print("starting to snowball form arxiv\n", flush=True)
+    og = None
+    df = df["doi"].dropna()
+    nrows = df.shape[0]
+    for row ,doi in enumerate(df):
+
+        print(f"row: {row} out of: {nrows}", flush=True)
+        restful_api = f"https://api.crossref.org/works/{doi}"
+        try:
+            r = requests.get(restful_api)
+            if(og is None):
+                og = pd.DataFrame(r.json()["message"]["reference"])
+            else:
+                new_result = og._append(pd.DataFrame(r.json()["message"]["reference"]))
+                og = new_result
+
+        except Exception:
+            continue
+
+    return og
+
+def snowball_from_doi (depth,*dois):
+
+    print(f"starting to snowball form depth == {depth}\n", flush=True)
+    og = None
+    for doi in dois:
+        print(doi)
+        restful_api = f"https://api.crossref.org/works/{doi}"
+        try:
+            r = requests.get(restful_api)
+            if(og is None):
+                og = pd.DataFrame(r.json()["message"]["reference"])
+            else:
+                og = og._append(pd.DataFrame(r.json()["message"]["reference"]))
+
+        except Exception as e:
+            print(f"ENCOUNTERED ERROR: {e}")
+    if (depth > 0):
+        og._append(snowball_from_doi(depth - 1, *list(og["DOI"])))
+
+    return og
+
 
 if __name__ == "__main__":
     dburl = URL.create("postgresql",
@@ -229,6 +296,9 @@ if __name__ == "__main__":
     #dblp_df.to_sql("dblp", engine, if_exists= "fail", index=False)
     #snowball_from_dblp(dblp_df).to_sql("dblp_snowball_depth_1", engine, if_exists = "fail", index=False)
     #zbmath_get().to_sql("zbmath", engine, if_exists = "fail", index=False)
-    df = pd.read_sql("zbmath", engine)
-    print(df, flush=True)
-    snowball_from_zbmath(df).to_sql("zbmath_snowball_depth_1", engine, if_exists = "fail", index=False)
+    #df = pd.read_sql("zbmath", engine)
+    #print(df, flush=True)
+    #snowball_from_zbmath(df).to_sql("zbmath_snowball_depth_1", engine, if_exists = "fail", index=False)
+    #serp_store().to_sql("serp", engine, if_exists="fail")
+    df = pd.read_sql("arxiv", engine)
+    snowball_from_arxiv(df).to_sql("arxiv_snowball_depth_1", engine)

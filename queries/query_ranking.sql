@@ -35,9 +35,9 @@ abstract (numerator) AS (SELECT 0),
 total (denominator) AS (
     SELECT COUNT(*) FROM dblp
 )
-SELECT ROUND(title.numerator::numeric/denominator, 2) as title,
-ROUND(doi.numerator::numeric/denominator, 2) as doi,
-ROUND(abstract.numerator::numeric/denominator, 2) as abstract 
+SELECT ROUND(title.numerator::numeric/denominator, 3) as title,
+ROUND(doi.numerator::numeric/denominator, 3) as doi,
+ROUND(abstract.numerator::numeric/denominator, 3) as abstract 
 INTO TEMP TABLE temp_dblp
 FROM title, doi, abstract, total;
 
@@ -57,9 +57,9 @@ total (denominator) AS (
     SELECT COUNT(*) FROM arxiv
 )
 
-SELECT ROUND(title.numerator::numeric/denominator, 2) as title,
-ROUND(doi.numerator::numeric/denominator, 2) as doi,
-ROUND(abstract.numerator::numeric/denominator, 2) as abstract 
+SELECT ROUND(title.numerator::numeric/denominator, 3) as title,
+ROUND(doi.numerator::numeric/denominator, 3) as doi,
+ROUND(abstract.numerator::numeric/denominator, 3) as abstract 
 INTO TEMP TABLE temp_arxiv
 FROM title, doi, abstract, total;
 
@@ -78,9 +78,9 @@ abstract (numerator) AS (
 total (denominator) AS (
     SELECT COUNT(*) FROM zbmath
 )
-SELECT ROUND(title.numerator::numeric/denominator, 2) as title,
-ROUND(doi.numerator::numeric/denominator, 2) as doi,
-ROUND(abstract.numerator::numeric/denominator, 2) as abstract 
+SELECT ROUND(title.numerator::numeric/denominator, 3) as title,
+ROUND(doi.numerator::numeric/denominator, 3) as doi,
+ROUND(abstract.numerator::numeric/denominator, 3) as abstract 
 INTO TEMP TABLE temp_zbmath
 FROM title, doi, abstract, total;
 
@@ -94,3 +94,6 @@ UNION ALL
 SELECT * FROM temp_zbmath;
 
 DROP TABLE temp_dblp, temp_arxiv, temp_zbmath;
+
+
+--TODO: change the temp tables to include snowball variants as well.

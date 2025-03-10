@@ -1,6 +1,8 @@
 bs4
+psycopg2-binary
 sqlalchemy
 pandas
 requests
 lxml
 selenium
+atpbar
